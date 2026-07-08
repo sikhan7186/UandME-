@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>UandME</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FF4D6D">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0B14;--bg2:#12122A;--bg3:#1A1A38;--surface:#222248;
+  --accent:#FF4D6D;--accent-l:#FF7B93;--accent-d:#CC3D58;
+  --accent-glow:rgba(255,77,109,.25);--green:#06D6A0;--blue:#118AB2;
+  --yellow:#FFD166;--txt:#EDF2F4;--txt2:#8D99AE;--txt3:#4A4A6A;
+  --border:#2B2B52;--sent:#FF4D6D;--recv:#1E1E40;--danger:#EF476F;
+  --radius:14px;--radius-sm:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--txt);overflow:hidden;height:100dvh;width:100vw;overscroll-behavior:none;position:fixed;inset:0}
+input,button,textarea{font-family:inherit;outline:none;border:none;background:none;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+a,.chat-item,.user-item,.contact-row,.call-action,.icon-btn{touch-action:manipulation}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateX(40px);transition:opacity .35s,transform .35s;z-index:1;background:var(--bg)}
+.screen.active{opacity:1;pointer-events:all;transform:translateX(0);z-index:2}
+
+#toast-box{position:fixed;top:calc(20px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:92vw}
+.toast{padding:12px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;opacity:0;transform:translateY(-20px);transition:all .3s;pointer-events:all;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-error{background:var(--danger);color:#fff}
+.toast-success{background:var(--green);color:#0B0B14}
+.toast-info{background:var(--blue);color:#fff}
+
+#splash{justify-content:center;align-items:center;z-index:100}
+#splash .logo{font-size:52px;font-weight:900;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:pulse 1.5s ease infinite}
+#splash .sub{color:var(--txt2);font-size:14px;margin-top:8px;letter-spacing:4px;text-transform:uppercase}
+#splash .loader{margin-top:32px;width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.97)}}
+
+#auth{justify-content:center;align-items:center;padding:24px;overflow-y:auto}
+#auth::before{content:'';position:fixed;top:-40%;left:-20%;width:600px;height:600px;background:radial-gradient(circle,var(--accent-glow),transparent 70%);pointer-events:none}
+.auth-card{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:36px clamp(20px,6vw,32px);box-shadow:0 20px 60px rgba(0,0,0,.4);position:relative;z-index:1}
+.auth-logo{font-size:36px;font-weight:900;text-align:center;background:linear-gradient(135deg,var(--accent),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.auth-sub{text-align:center;color:var(--txt2);font-size:13px;margin-bottom:32px}
+.auth-tab{display:flex;gap:4px;background:var(--bg);border-radius:var(--radius-sm);padding:4px;margin-bottom:28px}
+.auth-tab button{flex:1;padding:10px;border-radius:8px;font-size:14px;font-weight:600;color:var(--txt2);transition:all .3s}
+.auth-tab button.active{background:var(--accent);color:#fff}
+.form-group{position:relative;margin-bottom:18px}
+.form-group i.field-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--txt3);font-size:14px;z-index:2;pointer-events:none;transition:color .3s}
+.form-group input{width:100%;padding:14px 42px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;color:var(--txt);z-index:1;position:relative;transition:border-color .3s}
+.form-group input:focus{border-color:var(--accent)}
+.form-group input:focus~i.field-icon{color:var(--accent)}
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-d));color:#fff;border-radius:var(--radius-sm);font-size:15px;font-weight:700;transition:all .3s;box-shadow:0 4px 20px var(--accent-glow)}
+.btn-primary:hover{transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98)}
+.btn-primary:disabled{opacity:.5}
+.auth-form{display:none}.auth-form.active{display:block}
+.pw-toggle{position:absolute;left:auto;right:14px;top:50%;transform:translateY(-50%);color:var(--txt3);font-size:14px;cursor:pointer;padding:4px;z-index:3}
+.field-error{color:var(--danger);font-size:12.5px;margin-top:-10px;margin-bottom:14px;min-height:14px}
+
+.main-header{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top)) 20px 16px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.main-header h1{font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-actions{display:flex;gap:12px}
+.header-actions button{width:38px;height:38px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:15px;transition:all .3s}
+.header-actions button:hover{background:var(--surface);color:var(--txt)}
+.search-bar{margin:12px 20px 8px;position:relative}
+.search-bar input{width:100%;padding:12px 16px 12px 42px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;color:var(--txt)}
+.search-bar input:focus{border-color:var(--accent)}
+.search-bar i{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--txt3)}
+.chat-list{flex:1;overflow-y:auto;padding:4px 12px;position:relative}
+.chat-item{display:flex;align-items:center;gap:14px;padding:14px 12px;border-radius:var(--radius);cursor:pointer;transition:background .2s}
+.chat-item:hover{background:var(--bg2)}
+.avatar{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--blue));color:#fff}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.avatar-sm{width:40px;height:40px;font-size:15px}
+.avatar-lg{width:100px;height:100px;font-size:36px}
+.online-dot{position:absolute;bottom:2px;right:2px;width:12px;height:12px;background:var(--green);border-radius:50%;border:2px solid var(--bg)}
+.chat-info{flex:1;min-width:0}
+.chat-info h3{font-size:15px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-info p{font-size:13px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.chat-meta .time{font-size:11px;color:var(--txt3)}
+.unread-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.fab{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));right:24px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-d));color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px var(--accent-glow);transition:all .3s;z-index:5}
+.fab:active{transform:scale(.95)}
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--txt3);gap:12px;padding:40px}
+.empty-state i{font-size:48px;opacity:.3}
+.empty-state p{font-size:14px}
+
+.search-header{display:flex;align-items:center;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 20px 16px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.search-header button{width:38px;height:38px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:16px;flex-shrink:0}
+.search-header input{flex:1;padding:10px 16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;color:var(--txt)}
+.user-list{flex:1;overflow-y:auto;padding:8px 12px}
+.user-item{display:flex;align-items:center;gap:14px;padding:14px 12px;border-radius:var(--radius);cursor:pointer;transition:background .2s}
+.user-item:hover{background:var(--bg2)}
+
+.chat-header{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.chat-header .back-btn{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:18px;flex-shrink:0}
+.chat-header-info{flex:1;min-width:0}
+.chat-header-info h3{font-size:15px;font-weight:600}
+.chat-header-info span{font-size:12px;color:var(--txt3)}
+.chat-header-actions{display:flex;gap:6px}
+.chat-header-actions button{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:15px;transition:all .2s}
+.chat-header-actions button:hover{background:var(--bg3);color:var(--txt)}
+
+#msg-area{flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:4px;background:var(--bg);background-image:radial-gradient(circle at 15% 25%,rgba(255,77,109,.03) 0%,transparent 50%),radial-gradient(circle at 85% 75%,rgba(17,138,178,.03) 0%,transparent 50%)}
+.date-sep{text-align:center;padding:12px 0;align-self:center}
+.date-sep span{background:var(--bg3);color:var(--txt3);font-size:11px;font-weight:600;padding:6px 16px;border-radius:20px;letter-spacing:.5px}
+.msg-row{display:flex;max-width:80%;animation:msgIn .3s ease}
+.msg-row.sent{align-self:flex-end}
+.msg-row.recv{align-self:flex-start}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg-bubble{padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;position:relative;word-break:break-word}
+.msg-row.sent .msg-bubble{background:var(--sent);color:#fff;border-bottom-right-radius:4px}
+.msg-row.recv .msg-bubble{background:var(--recv);color:var(--txt);border-bottom-left-radius:4px}
+.msg-time{font-size:10px;opacity:.6;margin-top:4px;display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.msg-row.recv .msg-time{justify-content:flex-start}
+.msg-time .fa-check-double{font-size:11px;color:var(--green)}
+.msg-bubble img{max-width:220px;border-radius:10px;display:block}
+.msg-bubble audio{max-width:220px;height:34px}
+
+.typing-indicator{display:none;align-self:flex-start;padding:12px 18px;background:var(--recv);border-radius:16px;border-bottom-left-radius:4px;margin-top:4px}
+.typing-indicator.show{display:flex;gap:4px;align-items:center}
+.typing-dot{width:7px;height:7px;background:var(--txt3);border-radius:50%;animation:typeDot 1.4s ease infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes typeDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+
+.input-area{display:flex;align-items:flex-end;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg2);border-top:1px solid var(--border);position:relative}
+.input-area button{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:18px;transition:all .2s;flex-shrink:0}
+.input-area button:hover{color:var(--txt)}
+.input-area button.active{color:var(--accent)}
+#msg-input{flex:1;padding:10px 16px;background:var(--bg);border:1px solid var(--border);border-radius:22px;font-size:14px;color:var(--txt);max-height:120px;resize:none;line-height:1.4;overflow-y:auto}
+#msg-input:focus{border-color:var(--accent)}
+.send-btn{background:var(--accent)!important;color:#fff!important}
+.send-btn:hover{background:var(--accent-l)!important;transform:scale(1.05)}
+.record-btn.recording{background:var(--danger)!important;color:#fff!important;border-radius:50%}
+
+.emoji-panel{position:absolute;bottom:64px;left:8px;width:min(290px,calc(100vw - 20px));max-height:min(240px,40vh);background:var(--bg3);border:1px solid var(--border);border-radius:16px;display:none;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:20}
+.emoji-panel.show{display:flex}
+.emoji-grid{flex:1;overflow-y:auto;padding:8px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.emoji-grid button{aspect-ratio:1;font-size:21px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background .15s}
+.emoji-grid button:hover{background:var(--surface)}
+
+#call-screen{justify-content:center;align-items:center;background:linear-gradient(180deg,#0B0B14,#1A0A1E);z-index:50;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.call-avatar{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:800;margin-bottom:24px;animation:callPulse 2s ease infinite;background:linear-gradient(135deg,var(--accent),var(--blue));color:#fff}
+@keyframes callPulse{0%,100%{box-shadow:0 0 0 0 var(--accent-glow)}50%{box-shadow:0 0 0 20px transparent}}
+.call-name{font-size:24px;font-weight:700;margin-bottom:4px}
+.call-status{font-size:14px;color:var(--txt2);margin-bottom:48px}
+.call-status.ringing{animation:blink 1s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.call-actions{display:flex;gap:20px;margin-bottom:calc(40px + env(safe-area-inset-bottom));z-index:3}
+.call-action{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;transition:all .2s}
+.call-action.mute{background:var(--bg3);color:var(--txt)}
+.call-action.mute.active{background:var(--accent);color:#fff}
+.call-action.cam{background:var(--bg3);color:var(--txt)}
+.call-action.cam.active{background:var(--accent);color:#fff}
+.call-action.end{background:var(--danger);color:#fff;width:70px;height:70px;font-size:26px}
+.call-action:hover{transform:scale(1.08)}
+#remote-video,#local-video{position:absolute;object-fit:cover;background:#000}
+#remote-video{inset:0;width:100%;height:100%;z-index:0}
+#local-video{top:calc(50px + env(safe-area-inset-top));right:16px;width:min(110px,26vw);height:min(160px,38vw);border-radius:16px;z-index:1;border:2px solid var(--border)}
+.call-overlay-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;padding-bottom:40px;width:100%}
+.video-hidden{display:none!important}
+.incoming-actions{display:flex;gap:40px;margin-bottom:calc(40px + env(safe-area-inset-bottom))}
+.incoming-actions .call-action{width:64px;height:64px;font-size:24px}
+.incoming-actions .accept{background:var(--green);color:#0B0B14}
+
+.profile-header{display:flex;flex-direction:column;align-items:center;padding:calc(40px + env(safe-area-inset-top)) 20px 24px;background:var(--bg2);border-bottom:1px solid var(--border);position:relative}
+.profile-header .back-btn{position:absolute;top:16px;left:16px;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:16px}
+.profile-header h2{font-size:20px;font-weight:700}
+.profile-header p{font-size:13px;color:var(--txt2)}
+.profile-section{padding:20px;flex:1;overflow-y:auto}
+.profile-field{display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg2);border-radius:var(--radius);margin-bottom:10px}
+.profile-field i{width:40px;height:40px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:15px;flex-shrink:0}
+.profile-field .field-info{flex:1;min-width:0}
+.profile-field .field-info label{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;display:block}
+.profile-field .field-info span{font-size:14px;font-weight:500}
+.profile-field.logout{cursor:pointer}
+.profile-field.logout .field-info span{color:var(--danger)}
+
+.bottom-nav{display:flex;background:var(--bg2);border-top:1px solid var(--border)}
+.bottom-nav button{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--txt3);font-size:19px}
+.bottom-nav button.active{color:var(--accent)}
+.bottom-nav button span{font-size:10.5px;font-weight:600}
+
+/* ---- Small-screen phone refinements ---- */
+@media(max-width:380px){
+  .auth-logo{font-size:30px}
+  .auth-card{padding:28px 18px}
+  .call-avatar{width:100px;height:100px;font-size:36px}
+  .call-name{font-size:20px}
+  .avatar-lg{width:80px;height:80px;font-size:30px}
+  .msg-row{max-width:88%}
+  .main-header h1{font-size:21px}
+}
+@media(max-height:640px){
+  .auth-card{padding:24px 20px}
+  .auth-sub{margin-bottom:20px}
+  .form-group{margin-bottom:12px}
+}
+/* Ensure tap targets are comfortably sized on touch devices */
+.icon-btn,.header-actions button,.chat-header-actions button,.search-header button,.back-btn{min-width:38px;min-height:38px}
+.call-action{min-width:56px;min-height:56px}
+</style>
+</head>
+<body>
+
+<div id="toast-box"></div>
+
+<!-- SPLASH -->
+<div class="screen active" id="splash">
+  <div class="logo">UandME</div>
+  <div class="sub">Connect Closer</div>
+  <div class="loader"></div>
+</div>
+
+<!-- AUTH -->
+<div class="screen" id="auth">
+  <div class="auth-card">
+    <div class="auth-logo">UandME</div>
+    <div class="auth-sub">আপনার প্রিয়জনের সাথে সবসময় যুক্ত থাকুন</div>
+    <div class="auth-tab">
+      <button class="active" id="tab-login-btn" onclick="switchAuthTab('login')">লগইন</button>
+      <button id="tab-signup-btn" onclick="switchAuthTab('signup')">সাইনআপ</button>
+    </div>
+    <div class="auth-form active" id="login-form">
+      <div class="form-group">
+        <input type="email" id="login-email" placeholder="ইমেইল">
+        <i class="field-icon fa-solid fa-envelope"></i>
+      </div>
+      <div class="form-group">
+        <input type="password" id="login-pass" placeholder="পাসওয়ার্ড">
+        <i class="field-icon fa-solid fa-lock"></i>
+        <i class="pw-toggle fa-solid fa-eye" onclick="togglePw('login-pass',this)"></i>
+      </div>
+      <div class="field-error" id="login-error"></div>
+      <button class="btn-primary" onclick="doLogin()">লগইন করুন</button>
+    </div>
+    <div class="auth-form" id="signup-form">
+      <div class="form-group">
+        <input type="text" id="signup-name" placeholder="আপনার নাম">
+        <i class="field-icon fa-solid fa-user"></i>
+      </div>
+      <div class="form-group">
+        <input type="email" id="signup-email" placeholder="ইমেইল">
+        <i class="field-icon fa-solid fa-envelope"></i>
+      </div>
+      <div class="form-group">
+        <input type="password" id="signup-pass" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
+        <i class="field-icon fa-solid fa-lock"></i>
+        <i class="pw-toggle fa-solid fa-eye" onclick="togglePw('signup-pass',this)"></i>
+      </div>
+      <div class="field-error" id="signup-error"></div>
+      <button class="btn-primary" onclick="doSignup()">অ্যাকাউন্ট তৈরি করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN (chat list) -->
+<div class="screen" id="main">
+  <div class="main-header">
+    <h1>UandME</h1>
+    <div class="header-actions">
+      <button onclick="showScreen('profile')"><i class="fa-solid fa-user"></i></button>
+      <button onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </div>
+  <div class="search-bar">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="chat-filter" placeholder="চ্যাট খুঁজুন..." oninput="renderChatList()">
+  </div>
+  <div class="chat-list" id="chat-list"></div>
+  <button class="fab" onclick="openSearchScreen()"><i class="fa-solid fa-user-plus"></i></button>
+</div>
+
+<!-- SEARCH USERS -->
+<div class="screen" id="search-screen">
+  <div class="search-header">
+    <button onclick="showScreen('main')"><i class="fa-solid fa-arrow-left"></i></button>
+    <input type="text" id="user-search-input" placeholder="নাম বা ইমেইল দিয়ে খুঁজুন..." oninput="handleUserSearch()">
+  </div>
+  <div class="user-list" id="user-list">
+    <div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><p>কারো নাম বা ইমেইল লিখে খুঁজুন</p></div>
+  </div>
+</div>
+
+<!-- CHAT WINDOW -->
+<div class="screen" id="chat-screen">
+  <div class="chat-header">
+    <button class="back-btn" onclick="showScreen('main')"><i class="fa-solid fa-arrow-left"></i></button>
+    <div class="avatar avatar-sm" id="chat-peer-avatar"></div>
+    <div class="chat-header-info">
+      <h3 id="chat-peer-name"></h3>
+      <span id="chat-peer-status">অনলাইন</span>
+    </div>
+    <div class="chat-header-actions">
+      <button onclick="startCall('audio')"><i class="fa-solid fa-phone"></i></button>
+      <button onclick="startCall('video')"><i class="fa-solid fa-video"></i></button>
+    </div>
+  </div>
+  <div id="msg-area"></div>
+  <div class="typing-indicator" id="typing-ind"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+  <div class="input-area">
+    <div class="emoji-panel" id="emoji-panel"><div class="emoji-grid" id="emoji-grid"></div></div>
+    <button onclick="toggleEmojiPanel()"><i class="fa-regular fa-face-smile"></i></button>
+    <button onclick="document.getElementById('img-input').click()"><i class="fa-solid fa-paperclip"></i></button>
+    <input type="file" id="img-input" accept="image/*" style="display:none" onchange="sendImageMessage(event)">
+    <textarea id="msg-input" rows="1" placeholder="মেসেজ লিখুন..." oninput="handleTyping()" onkeydown="handleMsgKey(event)"></textarea>
+    <button class="record-btn" id="record-btn" onclick="toggleVoiceRecord()"><i class="fa-solid fa-microphone"></i></button>
+    <button class="send-btn" onclick="sendTextMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="screen" id="profile">
+  <div class="profile-header">
+    <button class="back-btn" onclick="showScreen('main')"><i class="fa-solid fa-arrow-left"></i></button>
+    <div class="avatar avatar-lg" id="my-avatar-lg"></div>
+    <h2 id="my-name-h2"></h2>
+    <p id="my-email-p"></p>
+  </div>
+  <div class="profile-section">
+    <div class="profile-field">
+      <i class="fa-solid fa-user"></i>
+      <div class="field-info"><label>নাম</label><span id="profile-name"></span></div>
+    </div>
+    <div class="profile-field">
+      <i class="fa-solid fa-envelope"></i>
+      <div class="field-info"><label>ইমেইল</label><span id="profile-email"></span></div>
+    </div>
+    <div class="profile-field logout" onclick="doLogout()">
+      <i class="fa-solid fa-right-from-bracket" style="color:var(--danger)"></i>
+      <div class="field-info"><span>লগআউট</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CALL SCREEN -->
+<div class="screen" id="call-screen">
+  <video id="remote-video" class="video-hidden" autoplay playsinline></video>
+  <video id="local-video" class="video-hidden" autoplay playsinline muted></video>
+  <div class="call-overlay-content">
+    <div class="call-avatar" id="call-avatar"></div>
+    <div class="call-name" id="call-peer-name-txt"></div>
+    <div class="call-status ringing" id="call-status-txt">রিং হচ্ছে...</div>
+    <div class="call-actions" id="active-call-actions" style="display:none">
+      <button class="call-action mute" id="mute-btn" onclick="toggleMute()"><i class="fa-solid fa-microphone"></i></button>
+      <button class="call-action cam" id="cam-btn" onclick="toggleCam()"><i class="fa-solid fa-video"></i></button>
+      <button class="call-action end" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
+    </div>
+    <div class="call-actions" id="outgoing-call-actions">
+      <button class="call-action end" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
+    </div>
+    <div class="incoming-actions" id="incoming-call-actions" style="display:none">
+      <button class="call-action end" onclick="rejectCall()"><i class="fa-solid fa-phone-slash"></i></button>
+      <button class="call-action accept" onclick="acceptCall()"><i class="fa-solid fa-phone"></i></button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= FIREBASE CONFIG (UandME project) ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyC5X3u2zXEYMHD7TKK_UeAQinwS62ImKMA",
+  authDomain: "uandme-ba15a.firebaseapp.com",
+  databaseURL: "https://uandme-ba15a-default-rtdb.firebaseio.com",
+  projectId: "uandme-ba15a",
+  storageBucket: "uandme-ba15a.firebasestorage.app",
+  messagingSenderId: "55124383429",
+  appId: "1:55124383429:web:c765de13c51b83499c02ac"
+};
+
+let auth, db;
+let currentUser = null;
+let currentChatId = null, currentPeer = null;
+let userChatsRef = null, msgsRef = null, typingRef = null;
+let allUserChats = {}, usersCache = {};
+let mediaRecorder, recChunks = [], isRecording = false;
+let localStream, peerConnection, currentCallId = null, callType = 'audio', isCaller = false;
+let callListeners = [];
+const STUN = {iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+const EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😜","🤔","😎","😢","😭","😡","👍","👎","🙏","👏","🔥","❤️","💔","🎉","✨","😴","🤗","😇","😅","🙄","😏","🥰","😳","🤯","👋","💪","🙌","✌️","🤝","👀","🍀","🌙"];
+
+/* ================= RINGTONE / VIBRATION ENGINE ================= */
+let sharedAudioCtx = null;
+let ringInterval = null;
+let ringActiveOscillators = [];
+
+function ensureAudioCtx(){
+  if (!sharedAudioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    sharedAudioCtx = new Ctx();
+  }
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(()=>{});
+  return sharedAudioCtx;
+}
+// Unlock audio on the very first tap anywhere (needed so later automatic ring sounds are allowed to play)
+window.addEventListener('pointerdown', function unlockAudio(){ ensureAudioCtx(); }, {passive:true});
+
+function playBeep(ctx, freqs, duration, startTime, gainVal){
+  freqs.forEach(freq => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainVal, startTime + 0.03);
+    gain.gain.setValueAtTime(gainVal, startTime + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+    ringActiveOscillators.push(osc);
+  });
+}
+
+function startRingTone(type){
+  stopRingTone();
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  const playCycle = () => {
+    const now = ctx.currentTime;
+    if (type === 'incoming') {
+      playBeep(ctx, [480, 620], 0.45, now, 0.16);
+      playBeep(ctx, [480, 620], 0.45, now + 0.55, 0.16);
+      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+    } else {
+      playBeep(ctx, [440, 480], 1.1, now, 0.12);
+    }
+  };
+  playCycle();
+  ringInterval = setInterval(playCycle, type === 'incoming' ? 2000 : 3000);
+}
+
+function stopRingTone(){
+  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+  ringActiveOscillators.forEach(o => { try { o.stop(); } catch(e){} });
+  ringActiveOscillators = [];
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+/* ================= INIT ================= */
+window.addEventListener('DOMContentLoaded', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+  try {
+    if (typeof firebase === 'undefined') throw new Error('Firebase লোড হয়নি।');
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.database();
+    const watchdog = setTimeout(() => showScreen('auth'), 4000);
+    auth.onAuthStateChanged(user => {
+      clearTimeout(watchdog);
+      if (user) {
+        db.ref('users/' + user.uid).once('value').then(snap => {
+          const data = snap.val() || {};
+          currentUser = { uid: user.uid, displayName: data.displayName || user.email.split('@')[0], email: user.email };
+          enterApp();
+        });
+      } else {
+        currentUser = null;
+        showScreen('auth');
+      }
+    }, err => { toast('Auth সমস্যা: ' + err.message, 'error'); showScreen('auth'); });
+  } catch(e){
+    document.body.innerHTML = `<div style="padding:40px;color:#EDF2F4;font-family:sans-serif;line-height:1.7;">
+      <h2 style="color:#FF4D6D;">একটা সমস্যা হয়েছে</h2><p>${e.message}</p>
+      <p style="color:#8D99AE;font-size:13px;">ফাইলটি সরাসরি ডাবল-ক্লিক করে (file://) খোলা হলে Firebase কাজ করে না। GitHub Pages বা Netlify তে আপলোড করে সেই লিংক থেকে খুলুন।</p></div>`;
+  }
+});
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function toast(msg, type){
+  const box = document.getElementById('toast-box');
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + (type||'info');
+  t.textContent = msg;
+  box.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 300); }, 3200);
+}
+function togglePw(id, iconEl){
+  const el = document.getElementById(id);
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  iconEl.classList.toggle('fa-eye', !show);
+  iconEl.classList.toggle('fa-eye-slash', show);
+}
+
+/* ================= AUTH ================= */
+function switchAuthTab(which){
+  document.getElementById('tab-login-btn').classList.toggle('active', which==='login');
+  document.getElementById('tab-signup-btn').classList.toggle('active', which==='signup');
+  document.getElementById('login-form').classList.toggle('active', which==='login');
+  document.getElementById('signup-form').classList.toggle('active', which==='signup');
+}
+
+function doSignup(){
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass = document.getElementById('signup-pass').value;
+  const errEl = document.getElementById('signup-error'); errEl.textContent = '';
+  if (!name || !email || pass.length < 6){ errEl.textContent = 'সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)।'; return; }
+  auth.createUserWithEmailAndPassword(email, pass).then(cred => {
+    return db.ref('users/' + cred.user.uid).set({
+      displayName: name, email: email, online: true, lastSeen: firebase.database.ServerValue.TIMESTAMP
+    });
+  }).catch(e => { errEl.textContent = translateErr(e); });
+}
+
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error'); errEl.textContent = '';
+  auth.signInWithEmailAndPassword(email, pass).catch(e => { errEl.textContent = translateErr(e); });
+}
+
+function translateErr(e){
+  const m = {'auth/email-already-in-use':'এই ইমেইলে আগেই অ্যাকাউন্ট আছে।','auth/invalid-email':'সঠিক ইমেইল দিন।',
+    'auth/weak-password':'পাসওয়ার্ড দুর্বল।','auth/user-not-found':'অ্যাকাউন্ট পাওয়া যায়নি।',
+    'auth/wrong-password':'পাসওয়ার্ড ভুল।','auth/invalid-credential':'ইমেইল বা পাসওয়ার্ড ভুল।'};
+  return m[e.code] || ('সমস্যা হয়েছে: ' + e.message);
+}
+
+function doLogout(){
+  if (currentUser) db.ref('users/'+currentUser.uid).update({online:false, lastSeen: firebase.database.ServerValue.TIMESTAMP});
+  cleanupAllListeners();
+  auth.signOut();
+}
+
+/* ================= ENTER APP / PRESENCE ================= */
+function enterApp(){
+  document.getElementById('my-avatar-lg').textContent = initials(currentUser.displayName);
+  document.getElementById('my-name-h2').textContent = currentUser.displayName;
+  document.getElementById('my-email-p').textContent = currentUser.email;
+  document.getElementById('profile-name').textContent = currentUser.displayName;
+  document.getElementById('profile-email').textContent = currentUser.email;
+
+  const myStatusRef = db.ref('users/' + currentUser.uid);
+  myStatusRef.update({online:true, lastSeen: firebase.database.ServerValue.TIMESTAMP});
+  myStatusRef.onDisconnect().update({online:false, lastSeen: firebase.database.ServerValue.TIMESTAMP});
+
+  listenUserChats();
+  listenIncomingCalls();
+  requestNotificationPermission();
+  showScreen('main');
+}
+function initials(name){ return (name||'?').trim().charAt(0).toUpperCase(); }
+
+/* ================= BACKGROUND CALL NOTIFICATIONS (no server needed) ================= */
+function requestNotificationPermission(){
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(()=>{});
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+}
+
+function notifyIncomingCallOS(peerName, type){
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const title = 'ইনকামিং ' + (type === 'video' ? 'ভিডিও' : 'অডিও') + ' কল';
+  const body = peerName + ' আপনাকে কল করছে';
+  const opts = {
+    body, icon: 'icon-192.png', badge: 'icon-192.png',
+    vibrate: [400,200,400,200,400], tag: 'uandme-incoming-call',
+    requireInteraction: true, renotify: true
+  };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts)).catch(() => {
+      try { new Notification(title, opts); } catch(e){}
+    });
+  } else {
+    try { new Notification(title, opts); } catch(e){}
+  }
+}
+function clearIncomingCallOSNotification(){
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(reg => reg.getNotifications({tag:'uandme-incoming-call'}).then(list => list.forEach(n => n.close()))).catch(()=>{});
+  }
+}
+
+/* ================= USER SEARCH ================= */
+let searchDebounce;
+function handleUserSearch(){
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runUserSearch, 300);
+}
+function runUserSearch(){
+  const q = document.getElementById('user-search-input').value.trim();
+  const listEl = document.getElementById('user-list');
+  if (!q){ listEl.innerHTML = '<div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><p>কারো নাম বা ইমেইল লিখে খুঁজুন</p></div>'; return; }
+  listEl.innerHTML = '<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>খুঁজছি...</p></div>';
+  const qLower = q.toLowerCase();
+
+  const byEmail = db.ref('users').orderByChild('email').startAt(qLower).endAt(qLower + '\uf8ff').once('value');
+  const byName = db.ref('users').orderByChild('displayName').startAt(q).endAt(q + '\uf8ff').once('value');
+
+  Promise.all([byEmail, byName]).then(([snapEmail, snapName]) => {
+    const results = {};
+    snapEmail.forEach(child => { if (child.key !== currentUser.uid) results[child.key] = {uid:child.key, ...child.val()}; });
+    snapName.forEach(child => { if (child.key !== currentUser.uid) results[child.key] = {uid:child.key, ...child.val()}; });
+    const arr = Object.values(results);
+    if (!arr.length){ listEl.innerHTML = '<div class="empty-state"><i class="fa-solid fa-user-slash"></i><p>কেউ পাওয়া যায়নি</p></div>'; return; }
+    listEl.innerHTML = arr.map(u => `
+      <div class="user-item" onclick='startChatWith(${JSON.stringify(u.uid)}, ${JSON.stringify(u.displayName||u.email)})'>
+        <div class="avatar avatar-sm">${initials(u.displayName)}</div>
+        <div class="chat-info"><h3>${escapeHtml(u.displayName||'')}</h3><p>${escapeHtml(u.email||'')}</p></div>
+      </div>`).join('');
+  }).catch(e => {
+    listEl.innerHTML = '<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>খোঁজা যায়নি। Realtime Database Rules-এ users.indexOn ঠিক আছে কিনা দেখুন।</p></div>';
+    console.error(e);
+  });
+}
+function openSearchScreen(){
+  document.getElementById('user-search-input').value = '';
+  document.getElementById('user-list').innerHTML = '<div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><p>কারো নাম বা ইমেইল লিখে খুঁজুন</p></div>';
+  showScreen('search-screen');
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+function chatIdFor(uidA, uidB){ return [uidA, uidB].sort().join('_'); }
+
+function startChatWith(peerUid, peerName){
+  usersCache[peerUid] = usersCache[peerUid] || {uid:peerUid, displayName:peerName};
+  const chatId = chatIdFor(currentUser.uid, peerUid);
+  const now = firebase.database.ServerValue.TIMESTAMP;
+  const updates = {};
+  updates['userChats/' + currentUser.uid + '/' + chatId] = { peerUid, peerName, lastMessage:'', lastTimestamp: now, unread: 0 };
+  updates['userChats/' + peerUid + '/' + chatId] = { peerUid: currentUser.uid, peerName: currentUser.displayName, lastMessage:'', lastTimestamp: now, unread: 0 };
+  db.ref().update(updates).then(() => { showScreen('main'); openChat(chatId, peerUid, peerName); }).catch(e => toast('চ্যাট শুরু করা যায়নি', 'error'));
+}
+
+/* ================= CHAT LIST ================= */
+function listenUserChats(){
+  userChatsRef = db.ref('userChats/' + currentUser.uid);
+  userChatsRef.on('value', snap => {
+    allUserChats = snap.val() || {};
+    Object.values(allUserChats).forEach(c => {
+      if (c.peerUid && !usersCache[c.peerUid]) {
+        db.ref('users/' + c.peerUid).once('value').then(s => { usersCache[c.peerUid] = {uid:c.peerUid, ...s.val()}; renderChatList(); });
+      }
+    });
+    renderChatList();
+  });
+}
+
+function renderChatList(){
+  const filter = (document.getElementById('chat-filter').value || '').toLowerCase();
+  const el = document.getElementById('chat-list');
+  const chats = Object.entries(allUserChats).map(([id, c]) => ({id, ...c}))
+    .filter(c => (c.peerName||'').toLowerCase().includes(filter))
+    .sort((a,b) => (b.lastTimestamp||0) - (a.lastTimestamp||0));
+  if (!chats.length){
+    el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-comments"></i><p>এখনো কোনো চ্যাট নেই।<br>নিচের বাটনে চেপে কাউকে খুঁজে চ্যাট শুরু করুন।</p></div>';
+    return;
+  }
+  el.innerHTML = chats.map(c => {
+    const online = usersCache[c.peerUid]?.online;
+    const time = c.lastTimestamp ? formatTime(c.lastTimestamp) : '';
+    return `<div class="chat-item" onclick='openChat(${JSON.stringify(c.id)}, ${JSON.stringify(c.peerUid)}, ${JSON.stringify(c.peerName)})'>
+      <div class="avatar">${initials(c.peerName)}${online?'<div class="online-dot"></div>':''}</div>
+      <div class="chat-info"><h3>${escapeHtml(c.peerName||'')}</h3><p>${escapeHtml(c.lastMessage||'')}</p></div>
+      <div class="chat-meta"><div class="time">${time}</div>${c.unread>0?`<div class="unread-badge">${c.unread}</div>`:''}</div>
+    </div>`;
+  }).join('');
+}
+function formatTime(ts){
+  const d = new Date(ts), now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('bn-BD',{day:'numeric',month:'short'});
+}
+
+/* ================= CHAT WINDOW ================= */
+function openChat(chatId, peerUid, peerName){
+  currentChatId = chatId;
+  currentPeer = {uid: peerUid, name: peerName};
+  document.getElementById('chat-peer-avatar').textContent = initials(peerName);
+  document.getElementById('chat-peer-name').textContent = peerName;
+  document.getElementById('chat-peer-status').textContent = usersCache[peerUid]?.online ? 'অনলাইন' : 'অফলাইন';
+  showScreen('chat-screen');
+
+  if (msgsRef) msgsRef.off();
+  msgsRef = db.ref('chats/' + chatId + '/messages').orderByChild('timestamp').limitToLast(200);
+  msgsRef.on('value', snap => {
+    const msgs = [];
+    snap.forEach(child => msgs.push({id:child.key, ...child.val()}));
+    renderMessages(msgs);
+    markSeen(chatId, msgs);
+  });
+
+  if (typingRef) typingRef.off();
+  typingRef = db.ref('chats/' + chatId + '/typing/' + peerUid);
+  typingRef.on('value', snap => {
+    document.getElementById('typing-ind').classList.toggle('show', !!snap.val());
+  });
+
+  db.ref('users/' + peerUid).on('value', snap => {
+    const d = snap.val() || {};
+    document.getElementById('chat-peer-status').textContent = d.online ? 'অনলাইন' : 'অফলাইন';
+    usersCache[peerUid] = {uid:peerUid, ...d};
+  });
+
+  db.ref('userChats/' + currentUser.uid + '/' + chatId + '/unread').set(0);
+}
+
+function renderMessages(msgs){
+  const el = document.getElementById('msg-area');
+  let lastDay = null, html = '';
+  msgs.forEach(m => {
+    const d = new Date(m.timestamp || Date.now());
+    const dayStr = d.toLocaleDateString('bn-BD', {day:'numeric', month:'long'});
+    if (dayStr !== lastDay){ html += `<div class="date-sep"><span>${dayStr}</span></div>`; lastDay = dayStr; }
+    const out = m.senderId === currentUser.uid;
+    const time = d.toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'});
+    let body = '';
+    if (m.type === 'image') body = `<img src="${m.content}">`;
+    else if (m.type === 'audio') body = `<audio controls src="${m.content}"></audio>`;
+    else body = escapeHtml(m.content||'').replace(/\\n/g,'<br>');
+    const ticks = out ? `<i class="fa-solid ${m.seen?'fa-check-double':'fa-check'}"></i>` : '';
+    html += `<div class="msg-row ${out?'sent':'recv'}"><div class="msg-bubble">${body}<div class="msg-time">${time}${ticks}</div></div></div>`;
+  });
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+function markSeen(chatId, msgs){
+  msgs.forEach(m => {
+    if (m.senderId !== currentUser.uid && !m.seen) {
+      db.ref('chats/' + chatId + '/messages/' + m.id + '/seen').set(true);
+    }
+  });
+}
+
+function handleMsgKey(e){ if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendTextMessage(); } }
+
+let typingTimeout;
+function handleTyping(){
+  if (!currentChatId) return;
+  db.ref('chats/' + currentChatId + '/typing/' + currentUser.uid).set(true);
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => db.ref('chats/' + currentChatId + '/typing/' + currentUser.uid).set(false), 2000);
+}
+
+function sendTextMessage(){
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !currentChatId) return;
+  input.value = '';
+  pushMessage({type:'text', content:text});
+}
+
+function pushMessage(msg){
+  const chatId = currentChatId;
+  const now = firebase.database.ServerValue.TIMESTAMP;
+  db.ref('chats/' + chatId + '/messages').push({ senderId: currentUser.uid, timestamp: now, seen:false, ...msg });
+  let preview = msg.type === 'text' ? msg.content : (msg.type === 'image' ? '📷 ছবি' : '🎤 ভয়েস মেসেজ');
+  const updates = {};
+  updates['userChats/' + currentUser.uid + '/' + chatId + '/lastMessage'] = preview.slice(0,80);
+  updates['userChats/' + currentUser.uid + '/' + chatId + '/lastTimestamp'] = now;
+  updates['userChats/' + currentPeer.uid + '/' + chatId + '/lastMessage'] = preview.slice(0,80);
+  updates['userChats/' + currentPeer.uid + '/' + chatId + '/lastTimestamp'] = now;
+  db.ref().update(updates);
+  db.ref('userChats/' + currentPeer.uid + '/' + chatId + '/unread').transaction(v => (v||0) + 1);
+}
+
+/* ---- Emoji ---- */
+function toggleEmojiPanel(){
+  const panel = document.getElementById('emoji-panel');
+  if (!panel.classList.contains('show')) {
+    document.getElementById('emoji-grid').innerHTML = EMOJIS.map(e => `<button onclick="insertEmoji('${e}')">${e}</button>`).join('');
+  }
+  panel.classList.toggle('show');
+}
+function insertEmoji(e){ const input = document.getElementById('msg-input'); input.value += e; input.focus(); }
+
+/* ---- Image ---- */
+function sendImageMessage(event){
+  const file = event.target.files[0]; if (!file) return;
+  resizeToBase64(file, 700, 0.7).then(b64 => pushMessage({type:'image', content:b64}));
+  event.target.value = '';
+}
+function resizeToBase64(file, maxW, quality){
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---- Voice ---- */
+function toggleVoiceRecord(){
+  if (isRecording) { mediaRecorder.stop(); isRecording = false; document.getElementById('record-btn').classList.remove('recording'); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream => {
+    recChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => recChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(recChunks, {type:'audio/webm'});
+      const reader = new FileReader();
+      reader.onload = () => pushMessage({type:'audio', content: reader.result});
+      reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById('record-btn').classList.add('recording');
+  }).catch(() => toast('মাইক্রোফোন অ্যাক্সেস দরকার', 'error'));
+}
+
+/* ================= WEBRTC CALLING (signaling via Realtime Database) ================= */
+function startCall(type){
+  if (!currentPeer) return;
+  callType = type; isCaller = true;
+  const callRef = db.ref('calls').push();
+  currentCallId = callRef.key;
+  peerConnection = new RTCPeerConnection(STUN);
+  wireCallEvents(callRef, true);
+
+  navigator.mediaDevices.getUserMedia({audio:true, video: type==='video'}).then(stream => {
+    localStream = stream;
+    stream.getTracks().forEach(t => peerConnection.addTrack(t, stream));
+    showCallScreen(type, currentPeer.name, true, false);
+    if (type === 'video') {
+      const lv = document.getElementById('local-video'); lv.srcObject = localStream; lv.classList.remove('video-hidden');
+    }
+    startRingTone('outgoing');
+    return peerConnection.createOffer();
+  }).then(offer => peerConnection.setLocalDescription(offer)).then(() => {
+    return callRef.set({
+      callerId: currentUser.uid, callerName: currentUser.displayName, calleeId: currentPeer.uid,
+      type, status:'ringing', offer: {type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp},
+      startedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  }).then(() => {
+    const l1 = callRef.on('value', snap => {
+      const data = snap.val(); if (!data) return;
+      if (data.answer && peerConnection.currentRemoteDescription === null) {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        stopRingTone();
+        document.getElementById('call-status-txt').textContent = type==='video' ? 'ভিডিও কলে সংযুক্ত' : 'কলে সংযুক্ত';
+        document.getElementById('call-status-txt').classList.remove('ringing');
+        document.getElementById('outgoing-call-actions').style.display = 'none';
+        document.getElementById('active-call-actions').style.display = 'flex';
+      }
+      if (data.status === 'rejected' || data.status === 'ended') endCall(true);
+    });
+    callListeners.push({ref:callRef, ev:'value'});
+    listenCandidates(callRef, 'calleeCandidates');
+  }).catch(e => { toast('ক্যামেরা/মাইক্রোফোন চালু করা যায়নি', 'error'); console.error(e); endCall(true); });
+}
+
+function wireCallEvents(callRef, asCaller){
+  peerConnection.onicecandidate = e => {
+    if (e.candidate) callRef.child(asCaller ? 'callerCandidates':'calleeCandidates').push(e.candidate.toJSON());
+  };
+  peerConnection.ontrack = e => {
+    const rv = document.getElementById('remote-video');
+    if (!rv.srcObject) rv.srcObject = new MediaStream();
+    rv.srcObject.addTrack(e.track);
+    if (callType === 'video') rv.classList.remove('video-hidden');
+  };
+}
+
+function listenCandidates(callRef, subpath){
+  const ref = callRef.child(subpath);
+  ref.on('child_added', snap => { if (peerConnection) peerConnection.addIceCandidate(new RTCIceCandidate(snap.val())); });
+  callListeners.push({ref, ev:'child_added'});
+}
+
+function listenIncomingCalls(){
+  const ref = db.ref('calls').orderByChild('calleeId').equalTo(currentUser.uid);
+  ref.on('child_added', snap => {
+    const data = snap.val();
+    if (data && data.status === 'ringing' && !currentCallId) showIncomingCall(snap.key, data);
+  });
+  callListeners.push({ref, ev:'child_added'});
+}
+
+let incomingData = null;
+function showIncomingCall(callId, data){
+  incomingData = {callId, ...data};
+  showCallScreen(data.type, data.callerName || 'অজানা', false, true);
+  startRingTone('incoming');
+  notifyIncomingCallOS(data.callerName || 'অজানা', data.type);
+}
+
+function acceptCall(){
+  if (!incomingData) return;
+  clearIncomingCallOSNotification();
+  const {callId, type, offer, callerId, callerName} = incomingData;
+  currentCallId = callId; callType = type; isCaller = false;
+  currentPeer = {uid: callerId, name: callerName};
+  const callRef = db.ref('calls/' + callId);
+  peerConnection = new RTCPeerConnection(STUN);
+  wireCallEvents(callRef, false);
+
+  navigator.mediaDevices.getUserMedia({audio:true, video: type==='video'}).then(stream => {
+    stopRingTone();
+    localStream = stream;
+    stream.getTracks().forEach(t => peerConnection.addTrack(t, stream));
+    document.getElementById('incoming-call-actions').style.display = 'none';
+    document.getElementById('active-call-actions').style.display = 'flex';
+    if (type === 'video' && localStream) {
+      const lv = document.getElementById('local-video'); lv.srcObject = localStream; lv.classList.remove('video-hidden');
+    }
+    return peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+  }).then(() => peerConnection.createAnswer()).then(answer => peerConnection.setLocalDescription(answer)).then(() => {
+    return callRef.update({status:'connected', answer: {type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp}});
+  }).then(() => {
+    listenCandidates(callRef, 'callerCandidates');
+    const l = callRef.on('value', snap => { const d = snap.val(); if (d && d.status === 'ended') endCall(true); });
+    callListeners.push({ref:callRef, ev:'value'});
+  }).catch(e => { toast('ক্যামেরা/মাইক্রোফোন চালু করা যায়নি', 'error'); console.error(e); endCall(true); });
+}
+
+function rejectCall(){
+  stopRingTone();
+  clearIncomingCallOSNotification();
+  if (incomingData) db.ref('calls/' + incomingData.callId).update({status:'rejected'});
+  incomingData = null;
+  showScreen(currentChatId ? 'chat-screen' : 'main');
+}
+
+function showCallScreen(type, peerName, outgoing, incoming){
+  showScreen('call-screen');
+  document.getElementById('call-avatar').textContent = initials(peerName);
+  document.getElementById('call-peer-name-txt').textContent = peerName;
+  document.getElementById('call-status-txt').textContent = incoming ? (type==='video'?'ইনকামিং ভিডিও কল...':'ইনকামিং অডিও কল...') : 'রিং হচ্ছে...';
+  document.getElementById('call-status-txt').classList.add('ringing');
+  document.getElementById('outgoing-call-actions').style.display = outgoing ? 'flex' : 'none';
+  document.getElementById('incoming-call-actions').style.display = incoming ? 'flex' : 'none';
+  document.getElementById('active-call-actions').style.display = 'none';
+  document.getElementById('cam-btn').style.display = type === 'video' ? 'flex' : 'none';
+  document.getElementById('remote-video').classList.add('video-hidden');
+  document.getElementById('local-video').classList.add('video-hidden');
+}
+
+function toggleMute(){
+  if (!localStream) return;
+  const track = localStream.getAudioTracks()[0]; if (!track) return;
+  track.enabled = !track.enabled;
+  document.getElementById('mute-btn').classList.toggle('active', !track.enabled);
+}
+function toggleCam(){
+  if (!localStream) return;
+  const track = localStream.getVideoTracks()[0]; if (!track) return;
+  track.enabled = !track.enabled;
+  document.getElementById('cam-btn').classList.toggle('active', !track.enabled);
+}
+
+function endCall(remote){
+  stopRingTone();
+  clearIncomingCallOSNotification();
+  if (currentCallId && !remote) db.ref('calls/' + currentCallId).update({status:'ended', endedAt: firebase.database.ServerValue.TIMESTAMP});
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  callListeners.forEach(l => l.ref.off(l.ev));
+  callListeners = [];
+  currentCallId = null; incomingData = null;
+  document.getElementById('remote-video').srcObject = null;
+  document.getElementById('local-video').srcObject = null;
+  showScreen(currentChatId ? 'chat-screen' : 'main');
+}
+
+function cleanupAllListeners(){
+  if (userChatsRef) userChatsRef.off();
+  if (msgsRef) msgsRef.off();
+  if (typingRef) typingRef.off();
+  callListeners.forEach(l => l.ref.off(l.ev));
+  callListeners = [];
+  currentChatId = null; allUserChats = {}; usersCache = {};
+}
+</script>
+</body>
+</html>
